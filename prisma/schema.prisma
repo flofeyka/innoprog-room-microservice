@@ -19,12 +19,47 @@ model Log {
 }
 
 model Room {
-  id       String   @id @default(uuid())
-  students String[]
-  teacher  String
-  logs     Log[]
+  id                      String       @id @default(uuid())
+  students                String[]
+  teacher                 String
+  taskId                  String?
+  studentCursorEnabled    Boolean      @default(false)
+  studentSelectionEnabled Boolean      @default(false)
+  studentEditCodeEnabled  Boolean      @default(false)
+  completed               Boolean      @default(false)
+  logs                    Log[]
+  roomMembers             RoomMember[]
+  roomState               RoomState?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @default(now()) @updatedAt
 
   @@map("rooms")
+}
+
+model RoomMember {
+  id         String   @id @default(uuid())
+  telegramId String
+  username   String?
+  roomId     String
+  room       Room     @relation(references: [id], fields: [roomId], onDelete: Cascade)
+  joinedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([telegramId, roomId])
+  @@map("room_members")
+}
+
+model RoomState {
+  id               String   @id @default(uuid())
+  roomId           String   @unique
+  room             Room     @relation(references: [id], fields: [roomId], onDelete: Cascade)
+  lastCode         String?  @db.Text
+  participantCount Int      @default(0)
+  lastActivity     DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("room_states")
 }
 
 datasource db {
