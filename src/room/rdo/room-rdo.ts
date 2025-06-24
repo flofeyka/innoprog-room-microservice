@@ -13,7 +13,42 @@ export class RoomRdo {
   @Expose()
   public teacher: string;
 
+  @ApiProperty({
+    title: 'Should cursor be enabled for students',
+    example: true,
+  })
+  @Expose()
+  studentCursorEnabled: boolean;
+
+  @ApiProperty({
+    title: 'Should selection be enabled for students',
+    example: false,
+  })
+  @Expose()
+  studentSelectionEnabled: boolean;
+
+  @ApiProperty({
+    title: 'Should code editing be enabled for students',
+    example: true,
+  })
+  @Expose()
+  studentEditCodeEnabled: boolean;
+
+  @ApiProperty({
+    title: 'Task id',
+    example: true,
+  })
+  @Expose()
+  taskId?: boolean;
+
+  @ApiProperty({
+    title: 'Is room completed',
+    example: true,
+  })
+  @Expose()
+  completed: boolean;
+
   @ApiProperty({ title: 'Students', example: ['4524263461', '4532452345'] })
   @Expose()
-  public students: string;
+  public students: string[];
 }
