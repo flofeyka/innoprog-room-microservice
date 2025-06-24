@@ -50,7 +50,7 @@ export class RoomService {
   async getRooms(id: string, dto: GetRoomsDto) {
     const { page = '1', limit = '5' } = dto;
 
-    const where: Prisma.RoomWhereInput = {
+    const where = {
       OR: [
         { teacher: id },
         {
