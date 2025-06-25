@@ -93,7 +93,7 @@ interface CodeEditPayload {
   newCode: string;
 }
 
-@WebSocketGateway(3000, {
+@WebSocketGateway({
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
