@@ -43,6 +43,7 @@ interface Room {
   studentCursorEnabled: boolean;
   studentSelectionEnabled: boolean;
   studentEditCodeEnabled: boolean;
+  completed: boolean;
 }
 
 interface EditPayload extends EditRoomDto {
@@ -99,6 +100,7 @@ interface CodeEditPayload {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  pingTimeout: 30000,
 })
 export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
@@ -146,7 +148,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     let room = await this.roomService.getRoom(roomId);
 
-    if (!room || (room.completed && room.teacher !== data.telegramId)) {
+    if (!room) {
       client.emit('error', { message: 'Комната не найдена' });
       return;
     }
@@ -180,6 +182,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         studentCursorEnabled: room.studentCursorEnabled ?? true,
         studentSelectionEnabled: room.studentSelectionEnabled ?? true,
         studentEditCodeEnabled: room.studentEditCodeEnabled ?? true,
+        completed: room.completed,
       };
       this.activeRooms.push(activeRoom);
 
@@ -285,6 +288,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         studentSelectionEnabled: activeRoom.studentSelectionEnabled,
         studentEditCodeEnabled: activeRoom.studentEditCodeEnabled,
       },
+      completed: room.completed,
     });
   }
 
@@ -296,6 +300,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Комната не найдена' });
       return;
     }
+    if (room.completed) return;
 
     const updatedRoom = await this.roomService.editRoom(room.id, {
       studentCursorEnabled: data.studentCursorEnabled,
@@ -330,6 +335,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Комната не найдена' });
       return;
     }
+
+    if (activeRoom.completed) return;
 
     if (!activeRoom.studentCursorEnabled) return;
 
@@ -373,6 +380,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message: 'Комната не найдена',
       });
     }
+
+    if (activeRoom.completed) return;
 
     if (!activeRoom.studentSelectionEnabled) {
       return;
@@ -445,6 +454,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message: 'Комната не найдена',
       });
     }
+
+    if (activeRoom.completed) return;
 
     if (!activeRoom.studentEditCodeEnabled) {
       return client.emit('error', {
@@ -543,6 +554,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return client.emit('error', { message: 'Комната не найдена' });
     }
 
+    if (activeRoom.completed) return;
+
     const member = activeRoom.members.find(
       (m) => m.telegramId === data.telegramId,
     );
@@ -592,6 +605,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
       return;
     }
+
+    if (activeRoom.completed) return;
 
     await this.roomService.completeRoom(data.roomId);
 
