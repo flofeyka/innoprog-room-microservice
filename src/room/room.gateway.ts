@@ -149,7 +149,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     let room = await this.roomService.getRoom(roomId);
 
     if (!room) {
-      client.emit('error', { message: 'Комната не найдена' });
+      client.emit('join-room:error', { message: 'Комната не найдена' });
       return;
     }
 
