@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RoomState } from '@prisma/client';
 
 @Injectable()
 export class RoomPersistenceService {
@@ -7,7 +8,6 @@ export class RoomPersistenceService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // Методы для работы с участниками
   async upsertRoomMember(
     roomId: string,
     telegramId: string,
@@ -16,10 +16,10 @@ export class RoomPersistenceService {
     try {
       return await this.prisma.$queryRaw`
         INSERT INTO room_members (id, "telegramId", username, "roomId", "joinedAt", "updatedAt")
-        VALUES (gen_random_uuid(), ${telegramId}, ${username || null}, ${roomId}, NOW(), NOW())
-        ON CONFLICT ("telegramId", "roomId") 
-        DO UPDATE SET username = ${username || null}, "updatedAt" = NOW()
-        RETURNING *;
+        VALUES (gen_random_uuid(), ${telegramId}, ${username || null}, ${roomId}, NOW(), NOW()) ON CONFLICT ("telegramId", "roomId") 
+        DO
+        UPDATE SET username = ${username || null}, "updatedAt" = NOW()
+          RETURNING *;
       `;
     } catch (error) {
       this.logger.error(`Error upserting room member: ${error.message}`);
@@ -30,8 +30,9 @@ export class RoomPersistenceService {
   async getRoomMembers(roomId: string) {
     try {
       return await this.prisma.$queryRaw`
-        SELECT * FROM room_members 
-        WHERE "roomId" = ${roomId} 
+        SELECT *
+        FROM room_members
+        WHERE "roomId" = ${roomId}
         ORDER BY "joinedAt" ASC;
       `;
     } catch (error) {
@@ -47,10 +48,11 @@ export class RoomPersistenceService {
   ) {
     try {
       return await this.prisma.$queryRaw`
-        UPDATE room_members 
-        SET username = ${username}, "updatedAt" = NOW()
-        WHERE "telegramId" = ${telegramId} AND "roomId" = ${roomId}
-        RETURNING *;
+        UPDATE room_members
+        SET username    = ${username},
+            "updatedAt" = NOW()
+        WHERE "telegramId" = ${telegramId}
+          AND "roomId" = ${roomId} RETURNING *;
       `;
     } catch (error) {
       this.logger.error(
@@ -61,18 +63,8 @@ export class RoomPersistenceService {
   }
 
   // Методы для работы с состоянием комнаты
-  async getRoomState(roomId: string) {
-    try {
-      const result = await this.prisma.$queryRaw`
-        SELECT * FROM room_states 
-        WHERE "roomId" = ${roomId} 
-        LIMIT 1;
-      `;
-      return Array.isArray(result) ? result[0] : null;
-    } catch (error) {
-      this.logger.error(`Error getting room state: ${error.message}`);
-      return null;
-    }
+  async getRoomState(roomId: string): Promise<RoomState | null> {
+    return this.prisma.roomState.findFirst({ where: { id: roomId } });
   }
 
   async updateRoomState(
@@ -85,14 +77,15 @@ export class RoomPersistenceService {
     try {
       return await this.prisma.$queryRaw`
         INSERT INTO room_states (id, "roomId", "lastCode", "participantCount", "lastActivity", "createdAt", "updatedAt")
-        VALUES (gen_random_uuid(), ${roomId}, ${data.lastCode || null}, ${data.participantCount || 0}, NOW(), NOW(), NOW())
-        ON CONFLICT ("roomId") 
-        DO UPDATE SET 
-          "lastCode" = COALESCE(${data.lastCode || null}, room_states."lastCode"),
-          "participantCount" = COALESCE(${data.participantCount}, room_states."participantCount"),
+        VALUES (gen_random_uuid(), ${roomId}, ${data.lastCode || null}, ${data.participantCount || 0}, NOW(), NOW(),
+                NOW()) ON CONFLICT ("roomId") 
+        DO
+        UPDATE SET
+          "lastCode" = COALESCE (${data.lastCode || null}, room_states."lastCode"),
+          "participantCount" = COALESCE (${data.participantCount}, room_states."participantCount"),
           "lastActivity" = NOW(),
           "updatedAt" = NOW()
-        RETURNING *;
+          RETURNING *;
       `;
     } catch (error) {
       this.logger.error(`Error updating room state: ${error.message}`);
@@ -104,13 +97,13 @@ export class RoomPersistenceService {
     try {
       return await this.prisma.$queryRaw`
         INSERT INTO room_states (id, "roomId", "participantCount", "lastActivity", "createdAt", "updatedAt")
-        VALUES (gen_random_uuid(), ${roomId}, 1, NOW(), NOW(), NOW())
-        ON CONFLICT ("roomId") 
-        DO UPDATE SET 
+        VALUES (gen_random_uuid(), ${roomId}, 1, NOW(), NOW(), NOW()) ON CONFLICT ("roomId") 
+        DO
+        UPDATE SET
           "participantCount" = room_states."participantCount" + 1,
           "lastActivity" = NOW(),
           "updatedAt" = NOW()
-        RETURNING *;
+          RETURNING *;
       `;
     } catch (error) {
       this.logger.error(
@@ -123,13 +116,11 @@ export class RoomPersistenceService {
   async decrementParticipantCount(roomId: string) {
     try {
       return await this.prisma.$queryRaw`
-        UPDATE room_states 
-        SET 
-          "participantCount" = GREATEST(room_states."participantCount" - 1, 0),
-          "lastActivity" = NOW(),
-          "updatedAt" = NOW()
-        WHERE "roomId" = ${roomId}
-        RETURNING *;
+        UPDATE room_states
+        SET "participantCount" = GREATEST(room_states."participantCount" - 1, 0),
+            "lastActivity"     = NOW(),
+            "updatedAt"        = NOW()
+        WHERE "roomId" = ${roomId} RETURNING *;
       `;
     } catch (error) {
       this.logger.error(
