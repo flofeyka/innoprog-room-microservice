@@ -8,6 +8,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Language {
+  js
+  py
+  cpp
+}
+
 model Log {
   id        String   @id @default(uuid())
   code      String
@@ -23,6 +29,7 @@ model Room {
   students                String[]
   teacher                 String
   taskId                  String?
+  language                Language     @default(py)
   studentCursorEnabled    Boolean      @default(false)
   studentSelectionEnabled Boolean      @default(false)
   studentEditCodeEnabled  Boolean      @default(false)

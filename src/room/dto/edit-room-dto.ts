@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { Language } from '@prisma/client';
 
 export class EditRoomDto {
   @ApiProperty({
@@ -33,4 +34,13 @@ export class EditRoomDto {
   @IsOptional()
   @IsString()
   taskId?: string;
+
+  @ApiProperty({
+    title: 'Programming language',
+    enum: Language,
+    example: Language.js,
+  })
+  @IsOptional()
+  @IsEnum(Language)
+  language?: Language;
 }

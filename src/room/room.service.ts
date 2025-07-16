@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { fillDto } from 'helpers/fill-dto/fill-dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room-dto';
@@ -76,6 +75,9 @@ export class RoomService {
   async getRoom(id: string) {
     const room = await this.prisma.room.findUnique({
       where: { id },
+      include: {
+        roomState: true,
+      },
     });
 
     return room ? fillDto(RoomRdo, room) : null;

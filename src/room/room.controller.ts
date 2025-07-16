@@ -8,6 +8,8 @@ import {
   Post,
   Put,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiNotFoundResponse,
@@ -23,6 +25,7 @@ import { RoomService } from './room.service';
 
 @ApiTags('Room')
 @Controller('room')
+@UsePipes(new ValidationPipe({ whitelist: true }))
 export class RoomController {
   constructor(private readonly roomService: RoomService) {}
 
