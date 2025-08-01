@@ -53,8 +53,8 @@ interface Room {
 }
 
 interface EditPayload extends EditRoomDto {
-  telegramId: string;
   roomId: string;
+  telegramId: string;
 }
 
 interface Log {
@@ -108,13 +108,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly roomService: RoomService,
     private readonly roomPersistenceService: RoomPersistenceService,
-    private readonly prisma: PrismaService
-  ) { }
+    private readonly prisma: PrismaService,
+  ) {}
 
   activeRooms: Room[] = [];
 
-  @WebSocketServer()
-  server: Server;
+  @WebSocketServer() server: Server;
 
   private generateUserColor(userId: string): string {
     const colors = [
@@ -142,8 +141,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return colors[Math.abs(hash) % colors.length];
   }
 
-  @SubscribeMessage('join-room')
-  async handleJoinRoom(
+  @SubscribeMessage('join-room') async handleJoinRoom(
     @MessageBody() data: JoinPayload,
     @ConnectedSocket() client: Socket,
   ) {
@@ -157,8 +155,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const isParticipant =
-      room.teacher === telegramId ||
-      room.students.includes(telegramId);
+      room.teacher === telegramId || room.students.includes(telegramId);
 
     if (!isParticipant) {
       room = await this.roomService.joinRoom(room.id, telegramId);
@@ -289,8 +286,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  @SubscribeMessage('edit-room')
-  async handleEditRoom(client: Socket, @MessageBody() data: EditPayload) {
+  @SubscribeMessage('edit-room') async handleEditRoom(
+    client: Socket,
+    @MessageBody() data: EditPayload,
+  ) {
     const room = await this.roomService.getRoom(data.roomId);
 
     if (!room || room.teacher !== data.telegramId) {
@@ -325,8 +324,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .emit('room-edited', fillDto(RoomRdo, updatedRoom));
   }
 
-  @SubscribeMessage('cursor')
-  handleCursor(client: Socket, data: CursorPayload) {
+  @SubscribeMessage('cursor') handleCursor(
+    client: Socket,
+    data: CursorPayload,
+  ) {
     const activeRoom = this.activeRooms.find((room) => room.id === data.roomId);
 
     if (!activeRoom) {
@@ -356,14 +357,16 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const cursorData = {
       ...data,
       userColor: member?.userColor,
-      username: member?.username
+      username: member?.username,
     };
 
     client.broadcast.to(activeRoom.id).emit('cursor-action', cursorData);
   }
 
-  @SubscribeMessage('selection')
-  handleSelection(client: Socket, data: SelectionPayload) {
+  @SubscribeMessage('selection') handleSelection(
+    client: Socket,
+    data: SelectionPayload,
+  ) {
     const activeRoom = this.activeRooms.find((room) => room.id === data.roomId);
 
     if (!activeRoom) {
@@ -372,9 +375,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     }
 
-    if (activeRoom.completed) return;
+    if (activeRoom.completed && activeRoom.teacher !== data.telegramId) return;
 
-    if (!activeRoom.studentSelectionEnabled) return;
+    if (
+      !activeRoom.studentSelectionEnabled &&
+      activeRoom.teacher !== data.telegramId
+    )
+      return;
 
     const member = activeRoom.members.find(
       (m) => m.telegramId === data.telegramId,
@@ -424,8 +431,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  @SubscribeMessage('code-edit')
-  handleCodeEdit(client: Socket, data: CodeEditPayload) {
+  @SubscribeMessage('code-edit') handleCodeEdit(
+    client: Socket,
+    data: CodeEditPayload,
+  ) {
     const activeRoom = this.activeRooms.find((room) => room.id === data.roomId);
 
     if (!activeRoom) {
@@ -434,7 +443,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     }
 
-    if (activeRoom.completed) return;
+    if (activeRoom.completed && activeRoom.teacher !== data.telegramId) return;
 
     if (
       !activeRoom.studentEditCodeEnabled &&
@@ -464,7 +473,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Отправляем изменения всем участникам комнаты, кроме отправителя
     Y.applyUpdate(doc, data.update);
 
-    client.broadcast.to(activeRoom.id).emit('test', 'test');
     // Рассылаем другим участникам
     client.broadcast.to(activeRoom.id).emit('code-edit-action', {
       telegramId: data.telegramId,
@@ -497,8 +505,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // });
   }
 
-  @SubscribeMessage('edit-member')
-  async handleEditMember(client: Socket, data: JoinPayload) {
+  @SubscribeMessage('edit-member') async handleEditMember(
+    client: Socket,
+    data: JoinPayload,
+  ) {
     const activeRoom = this.activeRooms.find((room) => room.id === data.roomId);
 
     if (!activeRoom) {
@@ -547,8 +557,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('close-session')
-  async handleCloseSession(client: Socket, data: JoinPayload) {
+  @SubscribeMessage('close-session') async handleCloseSession(
+    client: Socket,
+    data: JoinPayload,
+  ) {
     const activeRoom = await this.roomService.getRoom(data.roomId);
 
     if (!activeRoom || activeRoom.teacher !== data.telegramId) {
@@ -667,5 +679,5 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.docs.get(roomId)!;
   }
 
-  handleConnection(client: any, ...args: any[]) { }
+  handleConnection(client: any, ...args: any[]) {}
 }
