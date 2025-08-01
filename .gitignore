@@ -12,6 +12,8 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+crypt.js
+
 # OS
 .DS_Store
 
