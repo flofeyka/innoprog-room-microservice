@@ -10,7 +10,7 @@ import { RoomRdo } from './rdo/room-rdo';
 export class RoomService {
   private readonly logger: Logger = new Logger();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async createRoom(dto: CreateRoomDto): Promise<RoomRdo> {
     const room = await this.prisma.room.create({
@@ -29,7 +29,7 @@ export class RoomService {
   async editRoom(id: string, dto: EditRoomDto): Promise<RoomRdo> {
     try {
       const editedRoom = await this.prisma.room.update({
-        where: { id },
+        where: { id, teacher: dto.telegramId },
         data: dto,
       });
 
@@ -40,12 +40,13 @@ export class RoomService {
     }
   }
 
-  async deleteRoom(id: string): Promise<{ success: boolean }> {
+  async deleteRoom(id: string, telegramId: string): Promise<{ success: boolean }> {
     try {
-      await this.prisma.room.delete({ where: { id } });
+      await this.prisma.room.delete({ where: { id, teacher: telegramId } });
 
       return { success: true };
     } catch (e) {
+      console.error(e);
       throw new NotFoundException('Room not found');
     }
   }

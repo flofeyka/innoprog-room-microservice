@@ -272,8 +272,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         username: m.username,
       }));
 
-    console.log(room.teacher);
-    console.log(telegramId);
 
     client.emit('joined', {
       telegramId,
@@ -310,6 +308,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       studentEditCodeEnabled: data.studentEditCodeEnabled,
       studentSelectionEnabled: data.studentSelectionEnabled,
       language: data.language,
+      telegramId: data.telegramId,
       taskId: data.taskId,
     });
 

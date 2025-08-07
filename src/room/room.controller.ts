@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -22,15 +23,18 @@ import { EditRoomDto } from './dto/edit-room-dto';
 import { GetRoomsDto } from './dto/get-rooms-dto';
 import { RoomRdo } from './rdo/room-rdo';
 import { RoomService } from './room.service';
+import { AuthRoomGuard } from './auth-room.guard';
+import { DeleteRoomDto } from './dto/delete-room-dto';
 
 @ApiTags('Room')
 @Controller('room')
 @UsePipes(new ValidationPipe({ whitelist: true }))
 export class RoomController {
-  constructor(private readonly roomService: RoomService) {}
+  constructor(private readonly roomService: RoomService) { }
 
   @ApiOperation({ summary: 'Create room' })
   @ApiResponse({ status: 200, type: RoomRdo })
+  @UseGuards(AuthRoomGuard)
   @Post('/')
   async createRoom(@Body() dto: CreateRoomDto): Promise<RoomRdo> {
     return await this.roomService.createRoom(dto);
@@ -38,6 +42,7 @@ export class RoomController {
 
   @ApiOperation({ summary: 'Get all rooms by telegram id ' })
   @ApiResponse({ status: 200, type: [RoomRdo] })
+  @UseGuards(AuthRoomGuard)
   @Get('/:telegramId')
   async getRooms(
     @Param('telegramId') telegramId: string,
@@ -51,6 +56,7 @@ export class RoomController {
   @ApiNotFoundResponse({
     example: new NotFoundException('Room not found').getResponse(),
   })
+  @UseGuards(AuthRoomGuard)
   @Put('/:id')
   async editRoom(
     @Param('id') id: string,
@@ -64,8 +70,10 @@ export class RoomController {
   @ApiNotFoundResponse({
     example: new NotFoundException('Room not found').getResponse(),
   })
-  @Delete('/:id')
-  async deleteRoom(@Param('id') id: string): Promise<{ success: boolean }> {
-    return await this.roomService.deleteRoom(id);
+  @UseGuards(AuthRoomGuard)
+  @Delete('/')
+  async deleteRoom(@Body() dto: DeleteRoomDto): Promise<{ success: boolean }> {
+    console.log(dto);
+    return await this.roomService.deleteRoom(dto.id, dto.telegramId);
   }
 }
