@@ -24,6 +24,10 @@ interface JoinPayload {
   roomId: string;
 }
 
+interface EditMember extends JoinPayload {
+  changeTelegramId: string;
+}
+
 interface Member {
   clientId: string;
   telegramId: string;
@@ -109,7 +113,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly roomService: RoomService,
     private readonly roomPersistenceService: RoomPersistenceService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   activeRooms: Room[] = [];
 
@@ -221,7 +225,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } else {
       activeRoom?.members.push({
         clientId: client.id,
-        telegramId: telegramId,
+        telegramId,
         username,
         online: true,
         userColor: this.generateUserColor(telegramId),
@@ -268,8 +272,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         username: m.username,
       }));
 
+    console.log(room.teacher);
+    console.log(telegramId);
+
     client.emit('joined', {
-      telegramId: telegramId,
+      telegramId,
       currentCursors,
       currentSelections,
       userColor:
@@ -507,7 +514,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('edit-member') async handleEditMember(
     client: Socket,
-    data: JoinPayload,
+    data: EditMember,
   ) {
     const activeRoom = this.activeRooms.find((room) => room.id === data.roomId);
 
@@ -518,33 +525,27 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (activeRoom.completed) return;
 
     const member = activeRoom.members.find(
-      (m) => m.telegramId === data.telegramId,
+      (m) => m.telegramId === data.changeTelegramId,
     );
 
-    if (member) {
-      const oldUsername = member.username;
+    if (member && (member.telegramId === data.telegramId || activeRoom.teacher === data.telegramId)) {
       member.username = data.username;
 
       // Сохраняем в БД
       try {
         await this.roomPersistenceService.updateRoomMemberUsername(
           data.roomId,
-          data.telegramId!,
+          data.changeTelegramId,
           data.username || '',
-        );
-        console.log(
-          `👤 Member ${data.telegramId} updated username from "${oldUsername}" to "${data.username}"`,
         );
       } catch (error) {
         console.error('Error updating username in DB:', error);
       }
 
-      // Отправляем обновление участника всем в комнате
       this.server.to(activeRoom.id).emit('members-updated', {
         members: activeRoom.members.map((member) => ({
           telegramId: member.telegramId,
           username: member.username,
-          isYourself: member.telegramId === data.telegramId,
           online: member.online,
           userColor: member.userColor,
           lastActivity: member.lastActivity,
@@ -574,7 +575,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     await this.roomService.completeRoom(data.roomId);
 
-    console.log('🏁 Room completed by teacher:', data.telegramId);
 
     this.activeRooms = this.activeRooms.filter(
       (room) => room.id !== activeRoom.id,
@@ -586,18 +586,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    console.log('🔌 Client disconnected:', client.id);
 
     for (const room of this.activeRooms) {
       const member = room.members.find((m) => m.clientId === client.id);
       if (member) {
-        console.log('👤 Member leaving room:', {
-          telegramId: member.telegramId,
-          username: member.username,
-          roomId: room.id,
-          clientId: client.id,
-        });
-
         member.online = false;
         // Очищаем выделение пользователя
         member.lastSelection = undefined;
@@ -644,16 +636,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Проверяем, остались ли онлайн участники
         const onlineMembers = room.members.filter((m) => m.online);
         if (onlineMembers.length === 0) {
-          console.log(
-            `🏠 Room ${room.id} is now empty, performing final save...`,
-          );
 
           // Если комната опустела, сохраняем финальное состояние и удаляем из активных
           try {
             this.roomPersistenceService.updateRoomState(room.id, {
               participantCount: 0,
             });
-            console.log(`💾 Final state saved for room ${room.id}`);
           } catch (error) {
             console.error('Error saving final room state:', error);
           }
@@ -662,7 +650,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const roomIndex = this.activeRooms.findIndex((r) => r.id === room.id);
           if (roomIndex > -1) {
             this.activeRooms.splice(roomIndex, 1);
-            console.log(`🗑️ Removed room ${room.id} from active rooms`);
           }
         }
 
@@ -679,5 +666,5 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.docs.get(roomId)!;
   }
 
-  handleConnection(client: any, ...args: any[]) {}
+  handleConnection(client: any, ...args: any[]) { }
 }

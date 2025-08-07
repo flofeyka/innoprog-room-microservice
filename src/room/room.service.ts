@@ -16,6 +16,10 @@ export class RoomService {
     const room = await this.prisma.room.create({
       data: {
         teacher: dto.telegramId,
+        studentCursorEnabled: dto.studentCursorEnabled,
+        studentEditCodeEnabled: dto.studentEditCodeEnabled,
+        studentSelectionEnabled: dto.studentSelectionEnabled,
+        taskId: dto.taskId,
       },
     });
 
