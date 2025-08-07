@@ -9,10 +9,10 @@ export class AppService {
         return Buffer.from(b64, 'base64');
     }
 
-    decryptTelegramId(token: string): string | null {
+    decryptTelegramId(token: string): string | undefined {
         try {
             const { ENCRYPT_TELEGRAM_ID_KEY, ENCRYPT_TELEGRAM_ID_IV } = process.env;
-            if (!ENCRYPT_TELEGRAM_ID_IV || !ENCRYPT_TELEGRAM_ID_KEY) return null;
+            if (!ENCRYPT_TELEGRAM_ID_IV || !ENCRYPT_TELEGRAM_ID_KEY) return undefined;
             const key: Buffer = Buffer.from(ENCRYPT_TELEGRAM_ID_KEY, 'base64');
             const iv: Buffer = Buffer.from(ENCRYPT_TELEGRAM_ID_IV, 'base64');
             const encrypted = this.b64urlDecodeToBuf(token);
@@ -21,7 +21,7 @@ export class AppService {
             return decrypted.toString('utf8')
         } catch (e) {
             console.error(e)
-            return null
+            return undefined;
         }
     }
 };
