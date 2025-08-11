@@ -48,5 +48,6 @@ export class EditRoomDto {
     title: 'Crypted telegram id',
     example: 'b5269a83-72cb-47ee-b8ab-4a7768565080'
   })
+  @IsString()
   public telegramId: string;
 }
