@@ -30,7 +30,13 @@ export class RoomService {
     try {
       const editedRoom = await this.prisma.room.update({
         where: { id, teacher: dto.telegramId },
-        data: dto,
+        data: {
+          taskId: dto.taskId,
+          language: dto.language,
+          studentCursorEnabled: dto.studentCursorEnabled,
+          studentSelectionEnabled: dto.studentSelectionEnabled,
+          studentEditCodeEnabled: dto.studentEditCodeEnabled,
+        }
       });
 
       return fillDto(RoomRdo, editedRoom);
