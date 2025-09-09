@@ -12,6 +12,9 @@ enum Language {
   js
   py
   cpp
+  sql
+  dart
+  java
 }
 
 model Log {

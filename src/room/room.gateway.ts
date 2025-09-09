@@ -145,6 +145,20 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return colors[Math.abs(hash) % colors.length];
   }
 
+  private getInitialUpdate(lastCode: string) {
+    const ydoc = new Y.Doc();
+    const yText = ydoc.getText("codemirror");
+
+
+    yText.insert(0, lastCode);
+
+    // получаем бинарный апдейт
+    const update = Y.encodeStateAsUpdate(ydoc);
+
+    return update;
+  }
+
+
   @SubscribeMessage('join-room') async handleJoinRoom(
     @MessageBody() data: JoinPayload,
     @ConnectedSocket() client: Socket,
@@ -152,6 +166,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const { telegramId, roomId, username } = data;
 
     let room = await this.roomService.getRoom(roomId);
+
+    console.log(room);
 
     if (!room) {
       client.emit('join-room:error', { message: 'Комната не найдена' });
@@ -165,7 +181,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       room = await this.roomService.joinRoom(room.id, telegramId);
     }
 
-    // Сохраняем или обновляем участника в БД
     try {
       await this.roomPersistenceService.upsertRoomMember(
         roomId,
@@ -287,8 +302,18 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       },
       language: room.language,
       completed: room.completed,
+      joinedCode: room.roomState?.lastCode,
       lastCode: activeRoom?.lastCode,
     });
+
+    client.emit('code-edit-action', {
+      update: Y.encodeStateAsUpdate(this.getOrCreateDoc(room.id))
+    })
+    // if (activeRoom.lastCode) {
+    //   this.server.to(activeRoom.id).emit('code-edit-action', {
+    //     update: this.getInitialUpdate(activeRoom.lastCode)
+    //   })
+    // }
   }
 
   @SubscribeMessage('edit-room') async handleEditRoom(
@@ -476,10 +501,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const doc = this.getOrCreateDoc(data.roomId);
 
-    // Отправляем изменения всем участникам комнаты, кроме отправителя
     Y.applyUpdate(doc, data.update);
 
-    // Рассылаем другим участникам
     client.broadcast.to(activeRoom.id).emit('code-edit-action', {
       telegramId: data.telegramId,
       userColor: member?.userColor,
@@ -487,24 +510,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       update: data.update,
     });
 
-    // Пример автосохранения раз в 5 секунд после последнего изменения
-    // if (this.timers.has(data.roomId))
-    //   clearTimeout(this.timers.get(data.roomId));
-    // this.timers.set(
-    //   data.roomId,
-    //   setTimeout(async () => {
-    //     const code = doc.getText('codemirror').toString();
 
-    //     await this.prisma.roomState.upsert({
-    //       where: { roomId: data.roomId },
-    //       update: { lastCode: code || '' },
-    //       create: {
-    //         roomId: data.roomId,
-    //         lastCode: code,
-    //       },
-    //     });
-    //   }, 1000),
-    // );
+    const code = doc.getText('codemirror').toString();
+
+    this.activeRooms.map((room) => ({ ...room, lastCode: data.roomId === room.id && code }));
 
     // client.emit('code-edit-confirmed', {
     //   timestamp: Date.now(),
