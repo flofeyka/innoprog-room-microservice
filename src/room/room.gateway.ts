@@ -308,8 +308,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.emit('code-edit-action', {
       update: Y.encodeStateAsUpdate(this.getOrCreateDoc(room.id))
-    })
-    // if (activeRoom.lastCode) {
+    });
+
+    client.emit('selection-state', {
+      selections: currentSelections,
+      updatedUser: data.telegramId,
+    });    // if (activeRoom.lastCode) {
     //   this.server.to(activeRoom.id).emit('code-edit-action', {
     //     update: this.getInitialUpdate(activeRoom.lastCode)
     //   })
