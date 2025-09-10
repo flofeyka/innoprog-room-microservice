@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Language } from '@prisma/client';
 import { Expose } from 'class-transformer';
-import { Language, RoomState } from '@prisma/client';
 
 export class RoomRdo {
   @ApiProperty({
@@ -56,8 +56,4 @@ export class RoomRdo {
   @ApiProperty({ title: 'Language', enum: Language, example: Language.js })
   @Expose()
   public language: Language;
-
-  @ApiProperty({ title: 'State' })
-  @Expose()
-  public roomState?: RoomState;
 }

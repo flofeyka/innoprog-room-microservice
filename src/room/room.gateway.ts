@@ -11,7 +11,6 @@ import { fillDto } from 'helpers/fill-dto/fill-dto';
 import { Server, Socket } from 'socket.io';
 import { EditRoomDto } from './dto/edit-room-dto';
 import { RoomRdo } from './rdo/room-rdo';
-import { RoomPersistenceService } from './room-persistence.service';
 import { RoomService } from './room.service';
 import * as Y from 'yjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -53,7 +52,6 @@ interface Room {
   studentSelectionEnabled: boolean;
   studentEditCodeEnabled: boolean;
   completed: boolean;
-  lastCode?: string;
 }
 
 interface EditPayload extends EditRoomDto {
@@ -111,7 +109,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private readonly roomService: RoomService,
-    private readonly roomPersistenceService: RoomPersistenceService,
     private readonly prisma: PrismaService,
   ) { }
 
@@ -145,19 +142,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return colors[Math.abs(hash) % colors.length];
   }
 
-  private getInitialUpdate(lastCode: string) {
-    const ydoc = new Y.Doc();
-    const yText = ydoc.getText("codemirror");
-
-
-    yText.insert(0, lastCode);
-
-    // получаем бинарный апдейт
-    const update = Y.encodeStateAsUpdate(ydoc);
-
-    return update;
-  }
-
 
   @SubscribeMessage('join-room') async handleJoinRoom(
     @MessageBody() data: JoinPayload,
@@ -167,7 +151,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     let room = await this.roomService.getRoom(roomId);
 
-    console.log(room);
 
     if (!room) {
       client.emit('join-room:error', { message: 'Комната не найдена' });
@@ -179,16 +162,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (!isParticipant) {
       room = await this.roomService.joinRoom(room.id, telegramId);
-    }
-
-    try {
-      await this.roomPersistenceService.upsertRoomMember(
-        roomId,
-        telegramId,
-        username,
-      );
-    } catch (error) {
-      console.error('Error saving room member:', error);
     }
 
     await client.join(roomId);
@@ -204,26 +177,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         studentEditCodeEnabled: room.studentEditCodeEnabled ?? true,
         completed: room.completed,
         teacher: room.teacher,
-        lastCode: room.roomState?.lastCode || undefined,
       };
       this.activeRooms.push(activeRoom);
-
-      // Если это первый участник, загружаем состояние из БД
-      try {
-        const roomState =
-          await this.roomPersistenceService.getRoomState(roomId);
-        if (roomState && roomState.lastCode) {
-          // Отправляем сохраненный код первому участнику
-          setTimeout(() => {
-            client.emit('room-state-loaded', {
-              lastCode: roomState.lastCode,
-              participantCount: roomState.participantCount,
-            });
-          }, 500);
-        }
-      } catch (error) {
-        console.error('Error loading room state:', error);
-      }
     }
 
     const existingMember = activeRoom?.members.find(
@@ -246,13 +201,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userColor: this.generateUserColor(telegramId),
         lastActivity: new Date(),
       });
-    }
-
-    // Обновляем счетчик участников в БД
-    try {
-      await this.roomPersistenceService.incrementParticipantCount(roomId);
-    } catch (error) {
-      console.error('Error incrementing participant count:', error);
     }
 
     // Отправляем обновленный список участников всем в комнате
@@ -302,8 +250,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       },
       language: room.language,
       completed: room.completed,
-      joinedCode: room.roomState?.lastCode,
-      lastCode: activeRoom?.lastCode,
     });
 
     client.emit('code-edit-action', {
@@ -313,11 +259,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('selection-state', {
       selections: currentSelections,
       updatedUser: data.telegramId,
-    });    // if (activeRoom.lastCode) {
-    //   this.server.to(activeRoom.id).emit('code-edit-action', {
-    //     update: this.getInitialUpdate(activeRoom.lastCode)
-    //   })
-    // }
+    });
   }
 
   @SubscribeMessage('edit-room') async handleEditRoom(
@@ -425,13 +367,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (member) {
       member.lastActivity = new Date();
 
-      // Сохраняем последнее выделение пользователя
+
+
       if (
         data.line &&
         typeof data.column === 'number' &&
         (!data.selectionStart || !data.selectionEnd || !data.selectedText)
       ) {
-        // Очищаем выделение - оставляем только курсор
         member.lastSelection = {
           line: data.line,
           column: data.column,
@@ -441,12 +383,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.selectionEnd &&
         data.selectedText
       ) {
-        // Сохраняем выделение текста
         member.lastSelection = {
           selectionStart: data.selectionStart,
           selectionEnd: data.selectionEnd,
           selectedText: data.selectedText,
         };
+      } else if (data.clearSelection) {
+        member.lastSelection = {};
       }
     }
 
@@ -513,15 +456,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       username: member?.username,
       update: data.update,
     });
-
-
-    const code = doc.getText('codemirror').toString();
-
-    this.activeRooms.map((room) => ({ ...room, lastCode: data.roomId === room.id && code }));
-
-    // client.emit('code-edit-confirmed', {
-    //   timestamp: Date.now(),
-    // });
   }
 
   @SubscribeMessage('edit-member') async handleEditMember(
@@ -542,17 +476,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (member && (member.telegramId === data.telegramId || activeRoom.teacher === data.telegramId)) {
       member.username = data.username;
-
-      // Сохраняем в БД
-      try {
-        await this.roomPersistenceService.updateRoomMemberUsername(
-          data.roomId,
-          data.changeTelegramId,
-          data.username || '',
-        );
-      } catch (error) {
-        console.error('Error updating username in DB:', error);
-      }
 
       this.server.to(activeRoom.id).emit('members-updated', {
         members: activeRoom.members.map((member) => ({
@@ -603,15 +526,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const member = room.members.find((m) => m.clientId === client.id);
       if (member) {
         member.online = false;
-        // Очищаем выделение пользователя
         member.lastSelection = undefined;
-
-        // Уменьшаем счетчик участников в БД
-        try {
-          this.roomPersistenceService.decrementParticipantCount(room.id);
-        } catch (error) {
-          console.error('Error decrementing participant count:', error);
-        }
 
         this.server.to(room.id).emit('member-left', {
           telegramId: member.telegramId,
@@ -648,15 +563,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Проверяем, остались ли онлайн участники
         const onlineMembers = room.members.filter((m) => m.online);
         if (onlineMembers.length === 0) {
-
-          // Если комната опустела, сохраняем финальное состояние и удаляем из активных
-          try {
-            this.roomPersistenceService.updateRoomState(room.id, {
-              participantCount: 0,
-            });
-          } catch (error) {
-            console.error('Error saving final room state:', error);
-          }
 
           // Удаляем комнату из активных
           const roomIndex = this.activeRooms.findIndex((r) => r.id === room.id);
