@@ -39,7 +39,6 @@ model Room {
   completed               Boolean      @default(false)
   logs                    Log[]
   roomMembers             RoomMember[]
-  roomState               RoomState?
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @default(now()) @updatedAt
 
@@ -57,19 +56,6 @@ model RoomMember {
 
   @@unique([telegramId, roomId])
   @@map("room_members")
-}
-
-model RoomState {
-  id               String   @id @default(uuid())
-  roomId           String   @unique
-  room             Room     @relation(references: [id], fields: [roomId], onDelete: Cascade)
-  lastCode         String?  @db.Text
-  participantCount Int      @default(0)
-  lastActivity     DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("room_states")
 }
 
 datasource db {
